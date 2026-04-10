@@ -15,7 +15,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 # ═══════════════════════════════════════
 BOT_TOKEN = "8615838083:AAHQM2oyQDMkNMi4yqdSBBQeJ30OWeNDL7c"
 ADMIN_ID = 6175936997
-MANAGER_USERNAME = "ваш_ник"
+MANAGER_USERNAME = "X822MX"
 PROXY_URL = ""
 # ═══════════════════════════════════════
 
