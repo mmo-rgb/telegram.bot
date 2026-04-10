@@ -114,7 +114,7 @@ async def start(message: types.Message):
     name = message.from_user.first_name or "друг"
     await message.answer(
         f"Hey, {name}! 👋\n\n"
-        "Добро пожаловать в Radiance.fit ✨\n\n"
+        "Добро пожаловать в Radiance\u200b.fit ✨\n\n"
         "Здесь ты найдёшь лучшие добавки\n"
         "для здоровья и энергии 💪\n\n"
         "Жми кнопки снизу 👇",
@@ -128,7 +128,7 @@ async def admin_panel(message: types.Message):
 
 @dp.message(F.text == "🏠 Меню")
 async def back_to_main(message: types.Message):
-    await message.answer("Radiance.fit ✨", reply_markup=main_menu())
+    await message.answer("Radiance\u200b.fit ✨", reply_markup=main_menu())
 
 # ══════ CATALOG ══════
 @dp.message(F.text == "🛍 Каталог")
