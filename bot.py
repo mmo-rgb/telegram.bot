@@ -530,7 +530,7 @@ async def my_orders(message: types.Message):
     if not orders:
         await message.answer("Заказов пока нет 📦\n\nВремя это исправить! 😉")
         return
-    status_emoji = {"новый": "⏳", "обработан": "✅", "доставлен": "🚀"}
+    status_emoji = {"новый": "⏳", "собран": "📦", "отправлен": "🚚", "доставлен": "✅", "отменён": "❌"}
     text = "Твои заказы 📦\n\n"
     for order_id, total, status, created in orders:
         emoji = status_emoji.get(status, "📦")
@@ -553,22 +553,51 @@ async def admin_orders(message: types.Message):
         return
     for order_id, data, total, created in orders:
         kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Обработан", callback_data=f"done_{order_id}")]
+            [
+                InlineKeyboardButton(text="📦 Собран", callback_data=f"status_собран_{order_id}"),
+                InlineKeyboardButton(text="🚚 Отправлен", callback_data=f"status_отправлен_{order_id}")
+            ],
+            [
+                InlineKeyboardButton(text="✅ Доставлен", callback_data=f"status_доставлен_{order_id}"),
+                InlineKeyboardButton(text="❌ Отменён", callback_data=f"status_отменён_{order_id}")
+            ]
         ])
         await message.answer(f"🔔 Заказ #{order_id}\n{created}\n\n{data}", reply_markup=kb)
 
-@dp.callback_query(F.data.startswith("done_"))
-async def mark_done(call: types.CallbackQuery):
+STATUS_MESSAGES = {
+    "собран": "📦 Ваш заказ #{order_id} собран и готовится к отправке!",
+    "отправлен": "🚚 Ваш заказ #{order_id} отправлен! Скоро будет у вас 🎉",
+    "доставлен": "✅ Ваш заказ #{order_id} доставлен! Спасибо за покупку ❤️\n\nЕсли есть вопросы — пишите менеджеру 💬",
+    "отменён": "❌ Ваш заказ #{order_id} отменён.\n\nЕсли это ошибка — свяжитесь с менеджером 💬",
+}
+
+@dp.callback_query(F.data.startswith("status_"))
+async def change_order_status(call: types.CallbackQuery):
     if call.from_user.id != ADMIN_ID:
         return
-    order_id = int(call.data.split("_")[1])
+    parts = call.data.split("_")
+    new_status = parts[1]
+    order_id = int(parts[2])
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
-    cur.execute("UPDATE orders SET status='обработан' WHERE id=?", (order_id,))
+    cur.execute("SELECT user_id FROM orders WHERE id=?", (order_id,))
+    row = cur.fetchone()
+    cur.execute("UPDATE orders SET status=? WHERE id=?", (new_status, order_id))
     conn.commit()
     conn.close()
-    await call.message.edit_text(f"✅ Заказ #{order_id} обработан")
-    await call.answer()
+    status_emoji = {"собран": "📦", "отправлен": "🚚", "доставлен": "✅", "отменён": "❌"}
+    emoji = status_emoji.get(new_status, "📦")
+    await call.message.edit_text(f"{emoji} Заказ #{order_id} → {new_status}")
+    # Уведомление клиенту
+    if row:
+        user_id = row[0]
+        msg = STATUS_MESSAGES.get(new_status, "").format(order_id=order_id)
+        if msg:
+            try:
+                await bot.send_message(user_id, msg)
+            except:
+                pass
+    await call.answer(f"Статус обновлён: {new_status}")
 
 @dp.message(F.text == "➕ Добавить товар")
 async def add_product_start(message: types.Message, state: FSMContext):
