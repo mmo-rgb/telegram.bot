@@ -10,14 +10,10 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 import aiohttp
 from aiogram.client.session.aiohttp import AiohttpSession
 
-# ═══════════════════════════════════════
-#        R A D I A N C E . F I T
-# ═══════════════════════════════════════
 BOT_TOKEN = "8615838083:AAHQM2oyQDMkNMi4yqdSBBQeJ30OWeNDL7c"
 ADMIN_ID = 6175936997
 MANAGER_USERNAME = "X822MX"
 PROXY_URL = ""
-# ═══════════════════════════════════════
 
 if PROXY_URL:
     session = AiohttpSession(proxy=PROXY_URL, timeout=aiohttp.ClientTimeout(total=60))
@@ -98,9 +94,9 @@ class BroadcastState(StatesGroup):
 
 def main_menu():
     kb = [
-        [KeyboardButton(text="◈ Каталог"), KeyboardButton(text="◈ Поиск")],
-        [KeyboardButton(text="◈ Корзина"), KeyboardButton(text="◈ Избранное")],
-        [KeyboardButton(text="◈ Мои заказы"), KeyboardButton(text="◈ Менеджер")],
+        [KeyboardButton(text="🛍 Каталог"), KeyboardButton(text="🔍 Поиск")],
+        [KeyboardButton(text="🛒 Корзина"), KeyboardButton(text="❤️ Избранное")],
+        [KeyboardButton(text="📦 Мои заказы"), KeyboardButton(text="💬 Менеджер")],
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
@@ -108,37 +104,34 @@ def admin_menu():
     kb = [
         [KeyboardButton(text="➕ Добавить товар"), KeyboardButton(text="🗑 Удалить товар")],
         [KeyboardButton(text="📋 Заказы"), KeyboardButton(text="📊 Статистика")],
-        [KeyboardButton(text="📢 Рассылка"), KeyboardButton(text="◈ Меню")],
+        [KeyboardButton(text="📢 Рассылка"), KeyboardButton(text="🏠 Меню")],
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
+# ══════ START ══════
 @dp.message(Command("start"))
 async def start(message: types.Message):
+    name = message.from_user.first_name or "друг"
     await message.answer(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "       ✦ RADIANCE.FIT ✦\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Премиальные добавки\n"
-        "для вашего здоровья\n\n"
-        "▸ Сертифицированная продукция\n"
-        "▸ Доставка по всей России\n"
-        "▸ Персональные консультации\n\n"
-        "━━━━━━━━━━━━━━━━━━━━",
+        f"Hey, {name}! 👋\n\n"
+        "Добро пожаловать в Radiance.fit ✨\n\n"
+        "Здесь ты найдёшь лучшие добавки\n"
+        "для здоровья и энергии 💪\n\n"
+        "Жми кнопки снизу 👇",
         reply_markup=main_menu()
     )
 
 @dp.message(Command("admin"))
 async def admin_panel(message: types.Message):
     if message.from_user.id == ADMIN_ID:
-        await message.answer("⚙️ Панель управления", reply_markup=admin_menu())
-    else:
-        await message.answer("Нет доступа.")
+        await message.answer("⚙️ Админка", reply_markup=admin_menu())
 
-@dp.message(F.text == "◈ Меню")
+@dp.message(F.text == "🏠 Меню")
 async def back_to_main(message: types.Message):
-    await message.answer("✦ RADIANCE.FIT", reply_markup=main_menu())
+    await message.answer("Radiance.fit ✨", reply_markup=main_menu())
 
-@dp.message(F.text == "◈ Каталог")
+# ══════ CATALOG ══════
+@dp.message(F.text == "🛍 Каталог")
 async def catalog(message: types.Message):
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
@@ -146,24 +139,19 @@ async def catalog(message: types.Message):
     cats = cur.fetchall()
     buttons = []
     for cat_id, name in cats:
-        emoji = CAT_EMOJI.get(name, "▸")
+        emoji = CAT_EMOJI.get(name, "📁")
         cur.execute("SELECT COUNT(*) FROM products WHERE category_id=?", (cat_id,))
         count = cur.fetchone()[0]
         buttons.append([InlineKeyboardButton(
-            text=f"{emoji}  {name}  ·  {count} шт.",
+            text=f"{emoji} {name} ({count})",
             callback_data=f"cat_{cat_id}"
         )])
     conn.close()
     if not buttons:
-        await message.answer("Каталог пока пуст.")
+        await message.answer("Каталог пока пуст 😔")
         return
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await message.answer(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "         ◈  К А Т А Л О Г\n"
-        "━━━━━━━━━━━━━━━━━━━━",
-        reply_markup=kb
-    )
+    await message.answer("Выбирай категорию 👇", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("cat_"))
 async def show_products(call: types.CallbackQuery):
@@ -177,25 +165,20 @@ async def show_products(call: types.CallbackQuery):
     products = cur.fetchall()
     conn.close()
     if not products:
-        await call.message.answer("В этой категории пока нет товаров.")
+        await call.message.answer("Тут пока пусто 🤷‍♂️")
         await call.answer()
         return
+    emoji = CAT_EMOJI.get(cat_name, "📁")
     keyboard = []
     for prod_id, name, price in products:
         price_fmt = f"{price:,}".replace(",", " ")
         keyboard.append([InlineKeyboardButton(
-            text=f"▸  {name}  ·  {price_fmt}₽",
+            text=f"{name} • {price_fmt}₽",
             callback_data=f"detail_{prod_id}"
         )])
-    keyboard.append([InlineKeyboardButton(text="◂ Назад", callback_data="back_to_cats")])
+    keyboard.append([InlineKeyboardButton(text="⬅️ Назад", callback_data="back_to_cats")])
     reply_markup = InlineKeyboardMarkup(inline_keyboard=keyboard)
-    emoji = CAT_EMOJI.get(cat_name, "◈")
-    await call.message.edit_text(
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"  {emoji}  {cat_name}\n"
-        f"━━━━━━━━━━━━━━━━━━━━",
-        reply_markup=reply_markup
-    )
+    await call.message.edit_text(f"{emoji} {cat_name}", reply_markup=reply_markup)
     await call.answer()
 
 @dp.callback_query(F.data.startswith("detail_"))
@@ -210,27 +193,19 @@ async def show_product_detail(call: types.CallbackQuery):
     is_fav = cur.fetchone() is not None
     conn.close()
     if not result:
-        await call.message.answer("Товар не найден.")
-        await call.answer()
+        await call.answer("Товар не найден 😕")
         return
     name, desc, price, photo_id, cat_id = result
     price_fmt = f"{price:,}".replace(",", " ")
-    text = (
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"  ✦  {name}\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"{desc}\n\n"
-        f"Цена:  {price_fmt} ₽\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
-    )
-    fav_text = "♥" if is_fav else "♡"
+    text = f"✨ {name}\n\n{desc}\n\n💰 {price_fmt} ₽"
+    fav_btn = "❤️" if is_fav else "🤍"
     fav_data = f"unfav_{product_id}" if is_fav else f"fav_{product_id}"
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="◈ В корзину", callback_data=f"add_{product_id}"),
-            InlineKeyboardButton(text=fav_text, callback_data=fav_data)
+            InlineKeyboardButton(text="🛒 В корзину", callback_data=f"add_{product_id}"),
+            InlineKeyboardButton(text=fav_btn, callback_data=fav_data)
         ],
-        [InlineKeyboardButton(text="◂ Назад", callback_data=f"cat_{cat_id}")]
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data=f"cat_{cat_id}")]
     ])
     if photo_id:
         await call.message.answer_photo(photo=photo_id, caption=text, reply_markup=kb)
@@ -246,23 +221,19 @@ async def back_to_cats(call: types.CallbackQuery):
     cats = cur.fetchall()
     buttons = []
     for cat_id, name in cats:
-        emoji = CAT_EMOJI.get(name, "▸")
+        emoji = CAT_EMOJI.get(name, "📁")
         cur.execute("SELECT COUNT(*) FROM products WHERE category_id=?", (cat_id,))
         count = cur.fetchone()[0]
         buttons.append([InlineKeyboardButton(
-            text=f"{emoji}  {name}  ·  {count} шт.",
+            text=f"{emoji} {name} ({count})",
             callback_data=f"cat_{cat_id}"
         )])
     conn.close()
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-    await call.message.edit_text(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "         ◈  К А Т А Л О Г\n"
-        "━━━━━━━━━━━━━━━━━━━━",
-        reply_markup=kb
-    )
+    await call.message.edit_text("Выбирай категорию 👇", reply_markup=kb)
     await call.answer()
 
+# ══════ CART ══════
 @dp.callback_query(F.data.startswith("add_"))
 async def add_to_cart(call: types.CallbackQuery):
     product_id = int(call.data.split("_")[1])
@@ -272,103 +243,9 @@ async def add_to_cart(call: types.CallbackQuery):
     cur.execute("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, 1) ON CONFLICT(user_id, product_id) DO UPDATE SET quantity = quantity + 1", (user_id, product_id))
     conn.commit()
     conn.close()
-    await call.answer("✓ Добавлено в корзину", show_alert=False)
+    await call.answer("Добавлено ✅", show_alert=False)
 
-@dp.callback_query(F.data.startswith("fav_"))
-async def add_favorite(call: types.CallbackQuery):
-    product_id = int(call.data.split("_")[1])
-    user_id = call.from_user.id
-    conn = sqlite3.connect("shop.db")
-    cur = conn.cursor()
-    try:
-        cur.execute("INSERT INTO favorites (user_id, product_id) VALUES (?, ?)", (user_id, product_id))
-        conn.commit()
-    except sqlite3.IntegrityError:
-        pass
-    conn.close()
-    await call.answer("♥ Добавлено в избранное", show_alert=False)
-
-@dp.callback_query(F.data.startswith("unfav_"))
-async def remove_favorite(call: types.CallbackQuery):
-    product_id = int(call.data.split("_")[1])
-    user_id = call.from_user.id
-    conn = sqlite3.connect("shop.db")
-    cur = conn.cursor()
-    cur.execute("DELETE FROM favorites WHERE user_id=? AND product_id=?", (user_id, product_id))
-    conn.commit()
-    conn.close()
-    await call.answer("Убрано из избранного", show_alert=False)
-
-@dp.message(F.text == "◈ Избранное")
-async def show_favorites(message: types.Message):
-    user_id = message.from_user.id
-    conn = sqlite3.connect("shop.db")
-    cur = conn.cursor()
-    cur.execute("SELECT p.id, p.name, p.price FROM favorites f JOIN products p ON f.product_id = p.id WHERE f.user_id=?", (user_id,))
-    items = cur.fetchall()
-    conn.close()
-    if not items:
-        await message.answer(
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "       ♡  И З Б Р А Н Н О Е\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Пока пусто.\nНажмите ♡ на товаре."
-        )
-        return
-    keyboard = []
-    for prod_id, name, price in items:
-        price_fmt = f"{price:,}".replace(",", " ")
-        keyboard.append([InlineKeyboardButton(
-            text=f"♥  {name}  ·  {price_fmt}₽",
-            callback_data=f"detail_{prod_id}"
-        )])
-    kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
-    await message.answer(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "       ♥  И З Б Р А Н Н О Е\n"
-        "━━━━━━━━━━━━━━━━━━━━",
-        reply_markup=kb
-    )
-
-@dp.message(F.text == "◈ Поиск")
-async def search_start(message: types.Message, state: FSMContext):
-    await message.answer(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "        🔍  П О И С К\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Введите название товара:"
-    )
-    await state.set_state(SearchState.waiting_for_query)
-
-@dp.message(SearchState.waiting_for_query)
-async def search_results(message: types.Message, state: FSMContext):
-    query = message.text.lower()
-    conn = sqlite3.connect("shop.db")
-    cur = conn.cursor()
-    cur.execute("SELECT id, name, price FROM products WHERE LOWER(name) LIKE ? OR LOWER(description) LIKE ?",
-                (f"%{query}%", f"%{query}%"))
-    results = cur.fetchall()
-    conn.close()
-    await state.clear()
-    if not results:
-        await message.answer(f"По запросу «{message.text}» ничего не найдено.")
-        return
-    keyboard = []
-    for prod_id, name, price in results:
-        price_fmt = f"{price:,}".replace(",", " ")
-        keyboard.append([InlineKeyboardButton(
-            text=f"▸  {name}  ·  {price_fmt}₽",
-            callback_data=f"detail_{prod_id}"
-        )])
-    kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
-    await message.answer(
-        f"━━━━━━━━━━━━━━━━━━━━\n"
-        f"  🔍  Найдено: {len(results)}\n"
-        f"━━━━━━━━━━━━━━━━━━━━",
-        reply_markup=kb
-    )
-
-@dp.message(F.text == "◈ Корзина")
+@dp.message(F.text == "🛒 Корзина")
 async def show_cart(message: types.Message):
     user_id = message.from_user.id
     conn = sqlite3.connect("shop.db")
@@ -377,36 +254,26 @@ async def show_cart(message: types.Message):
     items = cur.fetchall()
     conn.close()
     if not items:
-        await message.answer(
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "       ◈  К О Р З И Н А\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "Пока пусто."
-        )
+        await message.answer("Корзина пустая 🛒\n\nЗагляни в каталог!")
         return
-    text = (
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "       ◈  К О Р З И Н А\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-    )
+    text = "🛒 Твоя корзина:\n\n"
     total = 0
     buttons = []
     for prod_id, name, price, qty in items:
         subtotal = price * qty
         total += subtotal
         sub_fmt = f"{subtotal:,}".replace(",", " ")
-        price_fmt = f"{price:,}".replace(",", " ")
-        text += f"▸ {name}\n   {qty} × {price_fmt}₽ = {sub_fmt}₽\n\n"
+        text += f"  {name}  x{qty}  →  {sub_fmt}₽\n"
         buttons.append([
-            InlineKeyboardButton(text="−", callback_data=f"cartminus_{prod_id}"),
-            InlineKeyboardButton(text=f"{qty} шт.", callback_data="noop"),
-            InlineKeyboardButton(text="+", callback_data=f"cartplus_{prod_id}"),
-            InlineKeyboardButton(text="✕", callback_data=f"cartdel_{prod_id}")
+            InlineKeyboardButton(text="➖", callback_data=f"cartminus_{prod_id}"),
+            InlineKeyboardButton(text=f"{qty}", callback_data="noop"),
+            InlineKeyboardButton(text="➕", callback_data=f"cartplus_{prod_id}"),
+            InlineKeyboardButton(text="❌", callback_data=f"cartdel_{prod_id}")
         ])
     total_fmt = f"{total:,}".replace(",", " ")
-    text += f"━━━━━━━━━━━━━━━━━━━━\nИтого:  {total_fmt} ₽\n━━━━━━━━━━━━━━━━━━━━"
-    buttons.append([InlineKeyboardButton(text="◈ Оформить заказ", callback_data="checkout")])
-    buttons.append([InlineKeyboardButton(text="✕ Очистить", callback_data="clear_cart")])
+    text += f"\n💰 Итого: {total_fmt}₽"
+    buttons.append([InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")])
+    buttons.append([InlineKeyboardButton(text="🗑 Очистить", callback_data="clear_cart")])
     kb = InlineKeyboardMarkup(inline_keyboard=buttons)
     await message.answer(text, reply_markup=kb)
 
@@ -419,9 +286,8 @@ async def cart_plus(call: types.CallbackQuery):
     cur.execute("UPDATE cart SET quantity = quantity + 1 WHERE user_id=? AND product_id=?", (user_id, product_id))
     conn.commit()
     conn.close()
-    await call.answer("✓")
+    await call.answer("✅")
     await call.message.delete()
-    # re-render cart
     fake_msg = call.message
     fake_msg.from_user = call.from_user
     await show_cart(fake_msg)
@@ -440,7 +306,7 @@ async def cart_minus(call: types.CallbackQuery):
         cur.execute("DELETE FROM cart WHERE user_id=? AND product_id=?", (user_id, product_id))
     conn.commit()
     conn.close()
-    await call.answer("✓")
+    await call.answer("✅")
     await call.message.delete()
     fake_msg = call.message
     fake_msg.from_user = call.from_user
@@ -455,7 +321,7 @@ async def cart_delete_item(call: types.CallbackQuery):
     cur.execute("DELETE FROM cart WHERE user_id=? AND product_id=?", (user_id, product_id))
     conn.commit()
     conn.close()
-    await call.answer("Удалено")
+    await call.answer("Удалено 🗑")
     await call.message.delete()
     fake_msg = call.message
     fake_msg.from_user = call.from_user
@@ -473,35 +339,26 @@ async def clear_cart(call: types.CallbackQuery):
     cur.execute("DELETE FROM cart WHERE user_id=?", (user_id,))
     conn.commit()
     conn.close()
-    await call.message.edit_text(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "       ◈  К О Р З И Н А\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Корзина очищена."
-    )
+    await call.message.edit_text("Корзина очищена 🧹")
     await call.answer()
 
+# ══════ CHECKOUT ══════
 @dp.callback_query(F.data == "checkout")
 async def start_order(call: types.CallbackQuery, state: FSMContext):
-    await call.message.answer(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "    ◈  О Ф О Р М Л Е Н И Е\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "Введите ваше имя:"
-    )
+    await call.message.answer("📝 Как тебя зовут?")
     await state.set_state(OrderForm.waiting_for_name)
     await call.answer()
 
 @dp.message(OrderForm.waiting_for_name)
 async def get_name(message: types.Message, state: FSMContext):
     await state.update_data(name=message.text)
-    await message.answer("Номер телефона:")
+    await message.answer("📱 Номер телефона?")
     await state.set_state(OrderForm.waiting_for_phone)
 
 @dp.message(OrderForm.waiting_for_phone)
 async def get_phone(message: types.Message, state: FSMContext):
     await state.update_data(phone=message.text)
-    await message.answer("Адрес доставки:")
+    await message.answer("📍 Адрес доставки?")
     await state.set_state(OrderForm.waiting_for_address)
 
 @dp.message(OrderForm.waiting_for_address)
@@ -516,26 +373,24 @@ async def get_address(message: types.Message, state: FSMContext):
     total = sum(price * qty for _, price, qty in items)
     conn.close()
     if not items:
-        await message.answer("Корзина пуста.")
+        await message.answer("Корзина пуста 😕")
         await state.clear()
         return
     total_fmt = f"{total:,}".replace(",", " ")
     text = (
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "     ◈  В А Ш   З А К А З\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"▸ Имя: {data['name']}\n"
-        f"▸ Тел: {data['phone']}\n"
-        f"▸ Адрес: {data['address']}\n\n"
+        f"📋 Проверь заказ:\n\n"
+        f"👤 {data['name']}\n"
+        f"📱 {data['phone']}\n"
+        f"📍 {data['address']}\n\n"
     )
     for name, price, qty in items:
         s = f"{price*qty:,}".replace(",", " ")
-        text += f"  {name} × {qty} = {s}₽\n"
-    text += f"\n━━━━━━━━━━━━━━━━━━━━\nИтого:  {total_fmt} ₽\n━━━━━━━━━━━━━━━━━━━━"
+        text += f"  {name} x{qty} → {s}₽\n"
+    text += f"\n💰 Итого: {total_fmt}₽\n\nВсё верно?"
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="◈ Подтвердить", callback_data="confirm_order"),
-            InlineKeyboardButton(text="✕ Отмена", callback_data="cancel_order")
+            InlineKeyboardButton(text="✅ Да", callback_data="confirm_order"),
+            InlineKeyboardButton(text="❌ Нет", callback_data="cancel_order")
         ]
     ])
     await message.answer(text, reply_markup=kb)
@@ -550,49 +405,121 @@ async def confirm_order(call: types.CallbackQuery, state: FSMContext):
     cur.execute("SELECT p.name, p.price, c.quantity FROM cart c JOIN products p ON c.product_id = p.id WHERE c.user_id=?", (user_id,))
     items = cur.fetchall()
     total = sum(price * qty for _, price, qty in items)
-    order_text = f"Клиент: {data['name']}\nТелефон: {data['phone']}\nАдрес: {data['address']}\n\n"
+    order_text = f"👤 {data['name']}\n📱 {data['phone']}\n📍 {data['address']}\n\n"
     for name, price, qty in items:
-        order_text += f"{name} × {qty} = {price*qty}₽\n"
-    order_text += f"\nИтого: {total}₽"
+        order_text += f"{name} x{qty} = {price*qty}₽\n"
+    order_text += f"\n💰 Итого: {total}₽"
     cur.execute("INSERT INTO orders (user_id, order_data, total) VALUES (?, ?, ?)", (user_id, order_text, total))
     order_id = cur.lastrowid
     cur.execute("DELETE FROM cart WHERE user_id=?", (user_id,))
     conn.commit()
     conn.close()
     await call.message.edit_text(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "            ✓  ПРИНЯТО\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"Заказ #{order_id} оформлен.\n"
-        "Менеджер свяжется с вами."
+        f"🎉 Заказ #{order_id} оформлен!\n\n"
+        "Менеджер скоро свяжется с тобой 📞"
     )
-    await bot.send_message(ADMIN_ID, f"━━━ НОВЫЙ ЗАКАЗ #{order_id} ━━━\n\n{order_text}\n\nUser ID: {user_id}")
+    await bot.send_message(ADMIN_ID, f"🔔 Новый заказ #{order_id}\n\n{order_text}\n\nUser ID: {user_id}")
     await state.clear()
     await call.answer()
 
 @dp.callback_query(F.data == "cancel_order", OrderForm.confirm)
 async def cancel_order(call: types.CallbackQuery, state: FSMContext):
-    await call.message.edit_text("Заказ отменён.")
+    await call.message.edit_text("Отменено ✖️")
     await state.clear()
     await call.answer()
 
-@dp.message(F.text == "◈ Менеджер")
+# ══════ FAVORITES ══════
+@dp.callback_query(F.data.startswith("fav_"))
+async def add_favorite(call: types.CallbackQuery):
+    product_id = int(call.data.split("_")[1])
+    user_id = call.from_user.id
+    conn = sqlite3.connect("shop.db")
+    cur = conn.cursor()
+    try:
+        cur.execute("INSERT INTO favorites (user_id, product_id) VALUES (?, ?)", (user_id, product_id))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass
+    conn.close()
+    await call.answer("Добавлено в избранное ❤️", show_alert=False)
+
+@dp.callback_query(F.data.startswith("unfav_"))
+async def remove_favorite(call: types.CallbackQuery):
+    product_id = int(call.data.split("_")[1])
+    user_id = call.from_user.id
+    conn = sqlite3.connect("shop.db")
+    cur = conn.cursor()
+    cur.execute("DELETE FROM favorites WHERE user_id=? AND product_id=?", (user_id, product_id))
+    conn.commit()
+    conn.close()
+    await call.answer("Убрано 💔", show_alert=False)
+
+@dp.message(F.text == "❤️ Избранное")
+async def show_favorites(message: types.Message):
+    user_id = message.from_user.id
+    conn = sqlite3.connect("shop.db")
+    cur = conn.cursor()
+    cur.execute("SELECT p.id, p.name, p.price FROM favorites f JOIN products p ON f.product_id = p.id WHERE f.user_id=?", (user_id,))
+    items = cur.fetchall()
+    conn.close()
+    if not items:
+        await message.answer("Пока пусто 🤍\n\nНажми 🤍 на товаре чтобы сохранить!")
+        return
+    keyboard = []
+    for prod_id, name, price in items:
+        price_fmt = f"{price:,}".replace(",", " ")
+        keyboard.append([InlineKeyboardButton(
+            text=f"❤️ {name} • {price_fmt}₽",
+            callback_data=f"detail_{prod_id}"
+        )])
+    kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    await message.answer("Твоё избранное ❤️", reply_markup=kb)
+
+# ══════ SEARCH ══════
+@dp.message(F.text == "🔍 Поиск")
+async def search_start(message: types.Message, state: FSMContext):
+    await message.answer("🔍 Что ищешь? Напиши название:")
+    await state.set_state(SearchState.waiting_for_query)
+
+@dp.message(SearchState.waiting_for_query)
+async def search_results(message: types.Message, state: FSMContext):
+    query = message.text.lower()
+    conn = sqlite3.connect("shop.db")
+    cur = conn.cursor()
+    cur.execute("SELECT id, name, price FROM products WHERE LOWER(name) LIKE ? OR LOWER(description) LIKE ?",
+                (f"%{query}%", f"%{query}%"))
+    results = cur.fetchall()
+    conn.close()
+    await state.clear()
+    if not results:
+        await message.answer(f"Ничего не нашлось по «{message.text}» 😕\n\nПопробуй другой запрос!")
+        return
+    keyboard = []
+    for prod_id, name, price in results:
+        price_fmt = f"{price:,}".replace(",", " ")
+        keyboard.append([InlineKeyboardButton(
+            text=f"{name} • {price_fmt}₽",
+            callback_data=f"detail_{prod_id}"
+        )])
+    kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
+    await message.answer(f"Нашлось {len(results)} 🔎", reply_markup=kb)
+
+# ══════ MANAGER ══════
+@dp.message(F.text == "💬 Менеджер")
 async def contact_manager(message: types.Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="◈ Написать менеджеру", url=f"https://t.me/{MANAGER_USERNAME}")]
+        [InlineKeyboardButton(text="💬 Написать", url=f"https://t.me/{MANAGER_USERNAME}")]
     ])
     await message.answer(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "     💬  М Е Н Е Д Ж Е Р\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "▸ Подбор добавок\n"
-        "▸ Консультация\n"
-        "▸ Помощь с заказом\n\n"
-        "━━━━━━━━━━━━━━━━━━━━",
+        "Наш менеджер поможет с:\n\n"
+        "💊 Подбором добавок\n"
+        "📦 Вопросами по заказу\n"
+        "🤝 Персональной консультацией",
         reply_markup=kb
     )
 
-@dp.message(F.text == "◈ Мои заказы")
+# ══════ MY ORDERS ══════
+@dp.message(F.text == "📦 Мои заказы")
 async def my_orders(message: types.Message):
     user_id = message.from_user.id
     conn = sqlite3.connect("shop.db")
@@ -601,26 +528,17 @@ async def my_orders(message: types.Message):
     orders = cur.fetchall()
     conn.close()
     if not orders:
-        await message.answer(
-            "━━━━━━━━━━━━━━━━━━━━\n"
-            "       ◈  З А К А З Ы\n"
-            "━━━━━━━━━━━━━━━━━━━━\n\n"
-            "У вас пока нет заказов."
-        )
+        await message.answer("Заказов пока нет 📦\n\nВремя это исправить! 😉")
         return
-    status_icon = {"новый": "⏳", "обработан": "✓", "доставлен": "✓✓"}
-    text = (
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "       ◈  З А К А З Ы\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-    )
+    status_emoji = {"новый": "⏳", "обработан": "✅", "доставлен": "🚀"}
+    text = "Твои заказы 📦\n\n"
     for order_id, total, status, created in orders:
-        icon = status_icon.get(status, "▸")
+        emoji = status_emoji.get(status, "📦")
         total_fmt = f"{total:,}".replace(",", " ")
-        text += f"{icon}  #{order_id}  ·  {total_fmt}₽  ·  {status}\n"
+        text += f"{emoji} #{order_id} • {total_fmt}₽ • {status}\n"
     await message.answer(text)
 
-# ── ADMIN ──
+# ══════ ADMIN ══════
 @dp.message(F.text == "📋 Заказы")
 async def admin_orders(message: types.Message):
     if message.from_user.id != ADMIN_ID:
@@ -631,13 +549,13 @@ async def admin_orders(message: types.Message):
     orders = cur.fetchall()
     conn.close()
     if not orders:
-        await message.answer("Новых заказов нет.")
+        await message.answer("Новых заказов нет 👌")
         return
     for order_id, data, total, created in orders:
         kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✓ Обработан", callback_data=f"done_{order_id}")]
+            [InlineKeyboardButton(text="✅ Обработан", callback_data=f"done_{order_id}")]
         ])
-        await message.answer(f"━━━ Заказ #{order_id} ━━━\n{created}\n\n{data}", reply_markup=kb)
+        await message.answer(f"🔔 Заказ #{order_id}\n{created}\n\n{data}", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("done_"))
 async def mark_done(call: types.CallbackQuery):
@@ -649,7 +567,7 @@ async def mark_done(call: types.CallbackQuery):
     cur.execute("UPDATE orders SET status='обработан' WHERE id=?", (order_id,))
     conn.commit()
     conn.close()
-    await call.message.edit_text(f"✓ Заказ #{order_id} обработан.")
+    await call.message.edit_text(f"✅ Заказ #{order_id} обработан")
     await call.answer()
 
 @dp.message(F.text == "➕ Добавить товар")
@@ -674,7 +592,7 @@ async def add_product_desc(message: types.Message, state: FSMContext):
 @dp.message(AddProduct.waiting_for_price)
 async def add_product_price(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
-        await message.answer("Введите число!")
+        await message.answer("Введи число!")
         return
     await state.update_data(price=int(message.text))
     conn = sqlite3.connect("shop.db")
@@ -687,7 +605,7 @@ async def add_product_price(message: types.Message, state: FSMContext):
         await state.clear()
         return
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"{CAT_EMOJI.get(n, '▸')} {n}", callback_data=f"setcat_{c}")] for c, n in cats
+        [InlineKeyboardButton(text=f"{CAT_EMOJI.get(n, '📁')} {n}", callback_data=f"setcat_{c}")] for c, n in cats
     ])
     await message.answer("Категория:", reply_markup=kb)
     await state.set_state(AddProduct.waiting_for_category)
@@ -696,7 +614,7 @@ async def add_product_price(message: types.Message, state: FSMContext):
 async def add_product_category(call: types.CallbackQuery, state: FSMContext):
     cat_id = int(call.data.split("_")[1])
     await state.update_data(category_id=cat_id)
-    await call.message.answer("Отправьте фото товара:")
+    await call.message.answer("📸 Скинь фото товара:")
     await state.set_state(AddProduct.waiting_for_photo)
     await call.answer()
 
@@ -710,7 +628,7 @@ async def add_product_photo(message: types.Message, state: FSMContext):
                 (data['name'], data['description'], data['price'], data['category_id'], photo_id))
     conn.commit()
     conn.close()
-    await message.answer("✓ Товар добавлен")
+    await message.answer("Товар добавлен ✅")
     await state.clear()
 
 @dp.message(F.text == "🗑 Удалить товар")
@@ -723,13 +641,13 @@ async def delete_product_list(message: types.Message):
     products = cur.fetchall()
     conn.close()
     if not products:
-        await message.answer("Товаров нет.")
+        await message.answer("Товаров нет")
         return
     keyboard = []
     for prod_id, name, price in products:
-        keyboard.append([InlineKeyboardButton(text=f"✕ {name} · {price}₽", callback_data=f"delprod_{prod_id}")])
+        keyboard.append([InlineKeyboardButton(text=f"❌ {name} • {price}₽", callback_data=f"delprod_{prod_id}")])
     kb = InlineKeyboardMarkup(inline_keyboard=keyboard)
-    await message.answer("Выберите товар для удаления:", reply_markup=kb)
+    await message.answer("Что удалить?", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("delprod_"))
 async def delete_product(call: types.CallbackQuery):
@@ -743,7 +661,7 @@ async def delete_product(call: types.CallbackQuery):
     cur.execute("DELETE FROM favorites WHERE product_id=?", (product_id,))
     conn.commit()
     conn.close()
-    await call.message.edit_text("✓ Товар удалён.")
+    await call.message.edit_text("Удалено 🗑")
     await call.answer()
 
 @dp.message(Command("add_category"))
@@ -760,9 +678,9 @@ async def add_category_cmd(message: types.Message):
     try:
         cur.execute("INSERT INTO categories (name) VALUES (?)", (cat_name,))
         conn.commit()
-        await message.answer(f"✓ Категория «{cat_name}» добавлена.")
+        await message.answer(f"Категория «{cat_name}» добавлена ✅")
     except sqlite3.IntegrityError:
-        await message.answer("Такая категория уже есть.")
+        await message.answer("Такая уже есть 🤷‍♂️")
     finally:
         conn.close()
 
@@ -770,7 +688,7 @@ async def add_category_cmd(message: types.Message):
 async def broadcast_start(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         return
-    await message.answer("Введите текст рассылки:")
+    await message.answer("Напиши текст рассылки:")
     await state.set_state(BroadcastState.waiting_for_text)
 
 @dp.message(BroadcastState.waiting_for_text)
@@ -790,7 +708,7 @@ async def send_broadcast(message: types.Message, state: FSMContext):
             count += 1
         except:
             pass
-    await message.answer(f"✓ Отправлено: {count}")
+    await message.answer(f"Отправлено: {count} 📨")
     await state.clear()
 
 @dp.message(F.text == "📊 Статистика")
@@ -810,18 +728,15 @@ async def statistics(message: types.Message):
     conn.close()
     rev_fmt = f"{revenue:,}".replace(",", " ")
     await message.answer(
-        "━━━━━━━━━━━━━━━━━━━━\n"
-        "     📊  С Т А Т И С Т И К А\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"▸ Заказов:  {total_orders}\n"
-        f"▸ Новых:  {new_count}\n"
-        f"▸ Выручка:  {rev_fmt}₽\n"
-        f"▸ Товаров:  {prod_count}\n\n"
-        "━━━━━━━━━━━━━━━━━━━━"
+        f"📊 Статистика\n\n"
+        f"📦 Заказов: {total_orders}\n"
+        f"🆕 Новых: {new_count}\n"
+        f"💰 Выручка: {rev_fmt}₽\n"
+        f"🏷 Товаров: {prod_count}"
     )
 
 async def main():
-    print("✦ Radiance.fit bot started")
+    print("✨ Radiance.fit bot started")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
