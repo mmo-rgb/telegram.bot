@@ -14,7 +14,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 BOT_TOKEN = "8615838083:AAHQM2oyQDMkNMi4yqdSBBQeJ30OWeNDL7c"
 ADMIN_ID = 6175936997
 MANAGER = "@X822MX"
-ADMIN_USERNAMES = ["radiancefit"]
+ADMIN_USERNAMES = ["radiancefit", "trapmentality1"]
 PROXY_URL = ""
 # =============================
 
