@@ -14,6 +14,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 BOT_TOKEN = "8615838083:AAHQM2oyQDMkNMi4yqdSBBQeJ30OWeNDL7c"
 ADMIN_ID = 6175936997
 MANAGER = "@X822MX"
+ADMIN_USERNAMES = ["radiancefit"]
 PROXY_URL = ""
 # =============================
 
@@ -156,7 +157,7 @@ async def cmd_start(message: types.Message):
 
 @dp.message(Command("admin"))
 async def cmd_admin(message: types.Message):
-    if message.from_user.id == ADMIN_ID:
+    if message.from_user.id == ADMIN_ID or (message.from_user.username and message.from_user.username.lower() in ADMIN_USERNAMES):
         await message.answer("🔐 Админка:", reply_markup=admin_menu())
 
 @dp.message(F.text == "↩️ На главную")
@@ -681,7 +682,7 @@ async def contact_manager(message: types.Message):
 
 @dp.message(F.text == "🗂 Заказы")
 async def admin_orders(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID and not (message.from_user.username and message.from_user.username.lower() in ADMIN_USERNAMES):
         return
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
@@ -702,7 +703,7 @@ async def admin_orders(message: types.Message):
 
 @dp.callback_query(F.data.startswith("st_"))
 async def set_status(call: types.CallbackQuery):
-    if call.from_user.id != ADMIN_ID:
+    if call.from_user.id != ADMIN_ID and not (call.from_user.username and call.from_user.username.lower() in ADMIN_USERNAMES):
         return
     parts = call.data.split("_", 2)
     oid = int(parts[1])
@@ -736,7 +737,7 @@ async def set_status(call: types.CallbackQuery):
 
 @dp.message(F.text == "＋ Добавить товар")
 async def add_product_start(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID and not (message.from_user.username and message.from_user.username.lower() in ADMIN_USERNAMES):
         return
     await message.answer("название товара:")
     await state.set_state(AddProduct.name)
@@ -795,7 +796,7 @@ async def ap_photo(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "✕ Удалить товар")
 async def del_product_list(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID and not (message.from_user.username and message.from_user.username.lower() in ADMIN_USERNAMES):
         return
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
@@ -810,7 +811,7 @@ async def del_product_list(message: types.Message):
 
 @dp.callback_query(F.data.startswith("dp_"))
 async def del_product(call: types.CallbackQuery):
-    if call.from_user.id != ADMIN_ID:
+    if call.from_user.id != ADMIN_ID and not (call.from_user.username and call.from_user.username.lower() in ADMIN_USERNAMES):
         return
     pid = int(call.data.split("_")[1])
     conn = sqlite3.connect("shop.db")
@@ -825,7 +826,7 @@ async def del_product(call: types.CallbackQuery):
 
 @dp.message(Command("add_category"))
 async def add_category(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID and not (message.from_user.username and message.from_user.username.lower() in ADMIN_USERNAMES):
         return
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
@@ -848,7 +849,7 @@ async def add_category(message: types.Message):
 
 @dp.message(F.text == "📈 Статистика")
 async def statistics(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID and not (message.from_user.username and message.from_user.username.lower() in ADMIN_USERNAMES):
         return
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
@@ -874,14 +875,14 @@ async def statistics(message: types.Message):
 
 @dp.message(F.text == "📣 Рассылка")
 async def broadcast_start(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID and not (message.from_user.username and message.from_user.username.lower() in ADMIN_USERNAMES):
         return
     await message.answer("текст рассылки:")
     await state.set_state(BroadcastForm.text)
 
 @dp.message(BroadcastForm.text)
 async def broadcast_send(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id != ADMIN_ID and not (message.from_user.username and message.from_user.username.lower() in ADMIN_USERNAMES):
         await state.clear()
         return
     conn = sqlite3.connect("shop.db")
