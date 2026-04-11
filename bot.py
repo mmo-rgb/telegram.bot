@@ -79,7 +79,7 @@ def setup_default_categories():
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM categories")
     if cur.fetchone()[0] == 0:
-        cats = [("БАДы", "💎"), ("Коллагены", "✨"), ("Для похудения", "🍃"), ("Крема", "🧴")]
+        cats = [("Коллагены", "✨"), ("БАДы", "💎"), ("Для похудения", "🍃"), ("Крема", "🧴")]
         for name, emoji in cats:
             cur.execute("INSERT OR IGNORE INTO categories (name, emoji) VALUES (?, ?)", (name, emoji))
         conn.commit()
