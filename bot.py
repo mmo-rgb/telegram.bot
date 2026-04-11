@@ -1,7 +1,5 @@
 import asyncio
 import sqlite3
-import asyncio
-import sqlite3
 import os
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
