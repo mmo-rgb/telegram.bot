@@ -34,7 +34,7 @@ def init_db():
     cur.execute("""CREATE TABLE IF NOT EXISTS categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL UNIQUE,
-        emoji TEXT DEFAULT '📁')""")
+        emoji TEXT DEFAULT '✦')""")
     cur.execute("""CREATE TABLE IF NOT EXISTS products (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
@@ -65,7 +65,7 @@ def init_db():
         first_name TEXT,
         registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
     try:
-        cur.execute("ALTER TABLE categories ADD COLUMN emoji TEXT DEFAULT '📁'")
+        cur.execute("ALTER TABLE categories ADD COLUMN emoji TEXT DEFAULT '✦'")
     except:
         pass
     conn.commit()
@@ -78,7 +78,7 @@ def setup_default_categories():
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM categories")
     if cur.fetchone()[0] == 0:
-        cats = [("Омега", "🐟"), ("Витамины", "💊"), ("Для похудения", "🔥")]
+        cats = [("Омега", "🫧"), ("Витамины", "⚡"), ("Для похудения", "🍃")]
         for name, emoji in cats:
             cur.execute("INSERT OR IGNORE INTO categories (name, emoji) VALUES (?, ?)", (name, emoji))
         conn.commit()
@@ -121,17 +121,17 @@ class SearchForm(StatesGroup):
 # ═══════════════════════════════════════
 def main_menu():
     kb = [
-        [KeyboardButton(text="🛍 Каталог"), KeyboardButton(text="🔍 Поиск")],
+        [KeyboardButton(text="🪩 Каталог"), KeyboardButton(text="🔍 Поиск")],
         [KeyboardButton(text="🛒 Корзина"), KeyboardButton(text="❤️ Избранное")],
-        [KeyboardButton(text="📦 Мои заказы"), KeyboardButton(text="💬 Менеджер")],
+        [KeyboardButton(text="🧾 Мои заказы"), KeyboardButton(text="✉️ Менеджер")],
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
 def admin_menu():
     kb = [
-        [KeyboardButton(text="➕ Добавить товар"), KeyboardButton(text="🗑 Удалить товар")],
-        [KeyboardButton(text="📋 Заказы"), KeyboardButton(text="📊 Статистика")],
-        [KeyboardButton(text="📢 Рассылка"), KeyboardButton(text="🏠 На главную")],
+        [KeyboardButton(text="＋ Добавить товар"), KeyboardButton(text="✕ Удалить товар")],
+        [KeyboardButton(text="🗂 Заказы"), KeyboardButton(text="📈 Статистика")],
+        [KeyboardButton(text="📣 Рассылка"), KeyboardButton(text="↩️ На главную")],
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
@@ -159,7 +159,7 @@ async def cmd_admin(message: types.Message):
     if message.from_user.id == ADMIN_ID:
         await message.answer("🔐 Админка:", reply_markup=admin_menu())
 
-@dp.message(F.text == "🏠 На главную")
+@dp.message(F.text == "↩️ На главную")
 async def go_home(message: types.Message):
     await message.answer("🏠", reply_markup=main_menu())
 
@@ -167,7 +167,7 @@ async def go_home(message: types.Message):
 #              CATALOG
 # ═══════════════════════════════════════
 
-@dp.message(F.text == "🛍 Каталог")
+@dp.message(F.text == "🪩 Каталог")
 async def catalog(message: types.Message):
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
@@ -181,7 +181,7 @@ async def catalog(message: types.Message):
         return
     buttons = []
     for cat_id, name, emoji, count in cats:
-        e = emoji or "📁"
+        e = emoji or "✦"
         buttons.append([InlineKeyboardButton(
             text=f"{e} {name}  •  {count} шт",
             callback_data=f"cat_{cat_id}"
@@ -228,7 +228,7 @@ async def back_to_cats(call: types.CallbackQuery):
     conn.close()
     buttons = []
     for cat_id, name, emoji, count in cats:
-        e = emoji or "📁"
+        e = emoji or "✦"
         buttons.append([InlineKeyboardButton(
             text=f"{e} {name}  •  {count} шт",
             callback_data=f"cat_{cat_id}"
@@ -647,7 +647,7 @@ async def cancel_order(call: types.CallbackQuery, state: FSMContext):
 
 STATUS_EMOJI = {"новый": "🆕", "собран": "📦", "отправлен": "🚚", "доставлен": "✅", "отменён": "❌", "обработан": "✅"}
 
-@dp.message(F.text == "📦 Мои заказы")
+@dp.message(F.text == "🧾 Мои заказы")
 async def my_orders(message: types.Message):
     uid = message.from_user.id
     conn = sqlite3.connect("shop.db")
@@ -668,7 +668,7 @@ async def my_orders(message: types.Message):
 #             CONTACTS
 # ═══════════════════════════════════════
 
-@dp.message(F.text == "💬 Менеджер")
+@dp.message(F.text == "✉️ Менеджер")
 async def contact_manager(message: types.Message):
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💬 написать менеджеру", url=f"https://t.me/{MANAGER.replace('@', '')}")]
@@ -679,7 +679,7 @@ async def contact_manager(message: types.Message):
 #          ADMIN — ORDERS
 # ═══════════════════════════════════════
 
-@dp.message(F.text == "📋 Заказы")
+@dp.message(F.text == "🗂 Заказы")
 async def admin_orders(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
@@ -734,7 +734,7 @@ async def set_status(call: types.CallbackQuery):
 #        ADMIN — ADD / DELETE
 # ═══════════════════════════════════════
 
-@dp.message(F.text == "➕ Добавить товар")
+@dp.message(F.text == "＋ Добавить товар")
 async def add_product_start(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         return
@@ -769,7 +769,7 @@ async def ap_price(message: types.Message, state: FSMContext):
         await state.clear()
         return
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"{e or '📁'} {n}", callback_data=f"setcat_{c}")] for c, n, e in cats
+        [InlineKeyboardButton(text=f"{e or '✦'} {n}", callback_data=f"setcat_{c}")] for c, n, e in cats
     ])
     await message.answer("категория:", reply_markup=kb)
     await state.set_state(AddProduct.category)
@@ -793,7 +793,7 @@ async def ap_photo(message: types.Message, state: FSMContext):
     await message.answer(f"✅ {data['name']} добавлен!")
     await state.clear()
 
-@dp.message(F.text == "🗑 Удалить товар")
+@dp.message(F.text == "✕ Удалить товар")
 async def del_product_list(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
@@ -846,7 +846,7 @@ async def add_category(message: types.Message):
 #        ADMIN — STATS & BROADCAST
 # ═══════════════════════════════════════
 
-@dp.message(F.text == "📊 Статистика")
+@dp.message(F.text == "📈 Статистика")
 async def statistics(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
@@ -872,7 +872,7 @@ async def statistics(message: types.Message):
         f"🏷 товаров: {t_prod}"
     )
 
-@dp.message(F.text == "📢 Рассылка")
+@dp.message(F.text == "📣 Рассылка")
 async def broadcast_start(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         return
