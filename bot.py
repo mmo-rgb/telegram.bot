@@ -619,20 +619,72 @@ async def confirm_order(call: types.CallbackQuery, state: FSMContext):
     conn.commit()
     conn.close()
 
+    card = "2200 7013 0843 9469"
+    total_fmt = fmt_price(total)
+    
     await call.message.edit_text(
-        f"✅ заказ №{order_id} оформлен!\n\n"
-        f"менеджер скоро свяжется 🤝\n"
-        f"или напиши сам: {MANAGER}"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"       💳  ОПЛАТА ЗАКАЗА №{order_id}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"💰 к оплате:  {total_fmt}₽\n\n"
+        f"🏦 Т‑Банк (Тинькофф)\n\n"
+        f"📋 Номер карты:\n"
+        f"`{card}`\n\n"
+        f"👤 Получатель:\n"
+        f"Анзор Х. М.\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"☝️ нажми на номер карты чтобы скопировать\n"
+        f"после оплаты жми кнопку ниже 👇",
+        parse_mode="Markdown",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=f"✅ я оплатил  •  {total_fmt}₽", callback_data=f"paid_{order_id}")],
+            [InlineKeyboardButton(text="❌ отменить заказ", callback_data=f"unpaid_{order_id}")],
+        ])
     )
 
     try:
         await bot.send_message(
             ADMIN_ID,
-            f"🔔 НОВЫЙ ЗАКАЗ №{order_id}\n\n{order_text}\n\n@{call.from_user.username or 'без ника'}"
+            f"🔔 НОВЫЙ ЗАКАЗ №{order_id}\n\n{order_text}\n\n@{call.from_user.username or 'без ника'}\n\n⏳ ожидает оплаты"
         )
     except:
         pass
     await state.clear()
+    await call.answer()
+
+@dp.callback_query(F.data.startswith("paid_"))
+async def user_paid(call: types.CallbackQuery):
+    order_id = int(call.data.split("_")[1])
+    conn = sqlite3.connect("shop.db")
+    cur = conn.cursor()
+    cur.execute("UPDATE orders SET status='оплачен' WHERE id=?", (order_id,))
+    conn.commit()
+    conn.close()
+    
+    await call.message.edit_text(
+        f"✅ заказ №{order_id} — ждём подтверждение оплаты\n\n"
+        f"менеджер проверит и свяжется с тобой 🤝\n"
+        f"или напиши сам: {MANAGER}"
+    )
+    
+    try:
+        await bot.send_message(
+            ADMIN_ID,
+            f"💰 КЛИЕНТ ОПЛАТИЛ заказ №{order_id}\n@{call.from_user.username or 'без ника'}\n\n⚠️ проверь поступление!"
+        )
+    except:
+        pass
+    await call.answer()
+
+@dp.callback_query(F.data.startswith("unpaid_"))
+async def user_unpaid(call: types.CallbackQuery):
+    order_id = int(call.data.split("_")[1])
+    conn = sqlite3.connect("shop.db")
+    cur = conn.cursor()
+    cur.execute("UPDATE orders SET status='отменён' WHERE id=?", (order_id,))
+    conn.commit()
+    conn.close()
+    await call.message.edit_text(f"заказ №{order_id} отменён 👌")
     await call.answer()
 
 @dp.callback_query(F.data == "cancel_order")
@@ -645,7 +697,7 @@ async def cancel_order(call: types.CallbackQuery, state: FSMContext):
 #             MY ORDERS
 # ═══════════════════════════════════════
 
-STATUS_EMOJI = {"новый": "🆕", "собран": "📦", "отправлен": "🚚", "доставлен": "✅", "отменён": "❌", "обработан": "✅"}
+STATUS_EMOJI = {"новый": "🆕", "оплачен": "💰", "собран": "📦", "отправлен": "🚚", "доставлен": "✅", "отменён": "❌", "обработан": "✅"}
 
 @dp.message(F.text == "🧾 Мои заказы")
 async def my_orders(message: types.Message):
