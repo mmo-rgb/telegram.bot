@@ -77,12 +77,11 @@ init_db()
 def setup_default_categories():
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
-    cur.execute("SELECT COUNT(*) FROM categories")
-    if cur.fetchone()[0] == 0:
-        cats = [("Коллагены", "✨"), ("БАДы", "💎"), ("Для похудения", "🍃"), ("Крема", "🧴")]
-        for name, emoji in cats:
-            cur.execute("INSERT OR IGNORE INTO categories (name, emoji) VALUES (?, ?)", (name, emoji))
-        conn.commit()
+    cur.execute("DELETE FROM categories")
+    cats = [("Коллагены", "✨"), ("БАДы", "💎"), ("Для похудения", "🍃"), ("Крема", "🧴")]
+    for name, emoji in cats:
+        cur.execute("INSERT OR IGNORE INTO categories (name, emoji) VALUES (?, ?)", (name, emoji))
+    conn.commit()
     conn.close()
 
 setup_default_categories()
@@ -545,7 +544,7 @@ async def checkout_start(call: types.CallbackQuery, state: FSMContext):
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
     cur.execute("SELECT COUNT(*) FROM cart WHERE user_id=?", (uid,))
-    if cur.fetchone()[0] == 0:
+    
         await call.answer("корзина пуста!", show_alert=True)
         conn.close()
         return
