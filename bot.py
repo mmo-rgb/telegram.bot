@@ -105,9 +105,8 @@ class AddProduct(StatesGroup):
     photo = State()
 
 class OrderForm(StatesGroup):
-    name = State()
-    phone = State()
-    address = State()
+    delivery_method = State()
+    info = State()
     confirm = State()
 
 class BroadcastForm(StatesGroup):
@@ -549,25 +548,47 @@ async def checkout_start(call: types.CallbackQuery, state: FSMContext):
         conn.close()
         return
     conn.close()
-    await call.message.answer("📝 оформляем заказ\n\nкак тебя зовут?")
-    await state.set_state(OrderForm.name)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🏤 Почта", callback_data="delivery_post")],
+        [InlineKeyboardButton(text="📌 Озон", callback_data="delivery_ozon")],
+    ])
+    await call.message.answer("📦 выбери способ доставки:", reply_markup=kb)
+    await state.set_state(OrderForm.delivery_method)
     await call.answer()
 
-@dp.message(OrderForm.name)
-async def order_name(message: types.Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await message.answer("📱 номер телефона")
-    await state.set_state(OrderForm.phone)
+@dp.callback_query(F.data == "delivery_post", OrderForm.delivery_method)
+async def delivery_post(call: types.CallbackQuery, state: FSMContext):
+    await state.update_data(delivery="Почта 🏤")
+    await call.message.edit_text(
+        "🏤 Почта\n\n"
+        "Для оформления заказа нам понадобятся следующие данные:\n"
+        "• Ф.И.О. получателя\n"
+        "• Номер мобильного телефона\n"
+        "• Индекс почтового отделения\n"
+        "• Адрес почтового отделения\n"
+        "• Город\n\n"
+        "✏️ отправь всё одним сообщением 👇"
+    )
+    await state.set_state(OrderForm.info)
+    await call.answer()
 
-@dp.message(OrderForm.phone)
-async def order_phone(message: types.Message, state: FSMContext):
-    await state.update_data(phone=message.text)
-    await message.answer("📍 адрес доставки")
-    await state.set_state(OrderForm.address)
+@dp.callback_query(F.data == "delivery_ozon", OrderForm.delivery_method)
+async def delivery_ozon(call: types.CallbackQuery, state: FSMContext):
+    await state.update_data(delivery="Озон 📌")
+    await call.message.edit_text(
+        "📌 Озон\n\n"
+        "Для оформления заказа нам понадобятся следующие данные:\n"
+        "• Город\n"
+        "• Адрес пункта выдачи Озон\n"
+        "• Номер телефона, привязанный к Озону\n\n"
+        "✏️ отправь всё одним сообщением 👇"
+    )
+    await state.set_state(OrderForm.info)
+    await call.answer()
 
-@dp.message(OrderForm.address)
-async def order_address(message: types.Message, state: FSMContext):
-    await state.update_data(address=message.text)
+@dp.message(OrderForm.info)
+async def order_info(message: types.Message, state: FSMContext):
+    await state.update_data(info=message.text)
     data = await state.get_data()
     uid = message.from_user.id
 
@@ -584,7 +605,7 @@ async def order_address(message: types.Message, state: FSMContext):
         return
 
     total = sum(p * q for _, p, q in items)
-    text = f"📝 проверь заказ:\n\n👤 {data['name']}\n📱 {data['phone']}\n📍 {data['address']}\n\n"
+    text = f"📝 проверь заказ:\n\n📦 {data['delivery']}\n\n📋 {data['info']}\n\n"
     for name, price, qty in items:
         text += f"▸ {name} × {qty} = {fmt_price(price*qty)}₽\n"
     text += f"\nитого: {fmt_price(total)}₽\n\nвсё верно?"
@@ -608,7 +629,7 @@ async def confirm_order(call: types.CallbackQuery, state: FSMContext):
     items = cur.fetchall()
     total = sum(p * q for _, p, q in items)
 
-    order_text = f"👤 {data['name']}\n📱 {data['phone']}\n📍 {data['address']}\n\n"
+    order_text = f"📦 {data['delivery']}\n\n📋 {data['info']}\n\n"
     for name, price, qty in items:
         order_text += f"{name} × {qty} = {price*qty}₽\n"
     order_text += f"\nИтого: {total}₽"
