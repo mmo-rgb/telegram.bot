@@ -9,11 +9,17 @@ echo "nameserver 8.8.4.4" >> /etc/resolv.conf
 echo "📦 Stopping old bot if running..."
 pm2 delete radiance-bot 2>/dev/null || true
 
+echo "📁 Backing up database..."
+cp /root/radiance/shop.db /tmp/shop.db.bak 2>/dev/null || true
+
 echo "📁 Cleaning old files..."
 rm -rf /root/radiance
 
 echo "⬇️ Cloning repo..."
 git clone https://github.com/mmo-rgb/telegram.bot.git /root/radiance
+
+echo "📁 Restoring database..."
+cp /tmp/shop.db.bak /root/radiance/shop.db 2>/dev/null || true
 
 echo "🐍 Creating venv..."
 cd /root/radiance

@@ -77,7 +77,7 @@ init_db()
 def setup_default_categories():
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
-    cur.execute("DELETE FROM categories")
+    # НЕ удаляем категории — только добавляем если их нет
     cats = [("Коллагены", "✨"), ("БАДы", "💎"), ("Для похудения", "🍃"), ("Крема", "🧴")]
     for name, emoji in cats:
         cur.execute("INSERT OR IGNORE INTO categories (name, emoji) VALUES (?, ?)", (name, emoji))
