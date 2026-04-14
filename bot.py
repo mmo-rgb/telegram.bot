@@ -758,20 +758,19 @@ async def admin_orders(message: types.Message):
         return
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
-    cur.execute("SELECT id, order_data, total, status, created_at FROM orders WHERE status IN ('новый','оплачен') ORDER BY created_at DESC")
+    cur.execute("SELECT id, order_data, total, status, created_at FROM orders WHERE status IN ('новый','оплачен','собран','отправлен') ORDER BY created_at DESC")
     orders = cur.fetchall()
     conn.close()
     if not orders:
         await message.answer("новых заказов нет 🎉")
         return
     for oid, data, total, status, created in orders:
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📦 собран", callback_data=f"st_{oid}_собран"),
-             InlineKeyboardButton(text="🚚 отправлен", callback_data=f"st_{oid}_отправлен")],
-            [InlineKeyboardButton(text="✅ доставлен", callback_data=f"st_{oid}_доставлен"),
-             InlineKeyboardButton(text="❌ отменён", callback_data=f"st_{oid}_отменён")],
-        ])
-        await message.answer(f"📦 Заказ №{oid}\n{created}\n\n{data}\n\nСтатус: {status}", reply_markup=kb)
+        e = STATUS_EMOJI.get(status, "❓")
+        all_statuses = ["собран", "отправлен", "доставлен", "отменён"]
+        remaining = [s for s in all_statuses if s != status]
+        buttons = [InlineKeyboardButton(text=f"{STATUS_EMOJI.get(s, '')} {s}", callback_data=f"st_{oid}_{s}") for s in remaining]
+        kb = InlineKeyboardMarkup(inline_keyboard=[buttons[i:i+2] for i in range(0, len(buttons), 2)])
+        await message.answer(f"📦 Заказ №{oid}\n{created}\n\n{data}\n\nСтатус: {e} {status}", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("st_"))
 async def set_status(call: types.CallbackQuery):
@@ -784,14 +783,25 @@ async def set_status(call: types.CallbackQuery):
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
     cur.execute("UPDATE orders SET status=? WHERE id=?", (new_st, oid))
-    cur.execute("SELECT user_id FROM orders WHERE id=?", (oid,))
+    cur.execute("SELECT user_id, order_data, total, created_at FROM orders WHERE id=?", (oid,))
     row = cur.fetchone()
     conn.commit()
     conn.close()
 
-    await call.message.edit_text(f"заказ №{oid} → {STATUS_EMOJI.get(new_st, '')} {new_st}")
-
     if row:
+        user_id, order_data, total, created_at = row
+        e = STATUS_EMOJI.get(new_st, "❓")
+        text = f"📦 Заказ №{oid}\n{created_at}\n\n{order_data}\n\nСтатус: {e} {new_st}"
+
+        all_statuses = ["собран", "отправлен", "доставлен", "отменён"]
+        remaining = [s for s in all_statuses if s != new_st]
+        buttons = []
+        for s in remaining:
+            buttons.append(InlineKeyboardButton(text=f"{STATUS_EMOJI.get(s, '')} {s}", callback_data=f"st_{oid}_{s}"))
+        kb = InlineKeyboardMarkup(inline_keyboard=[buttons[i:i+2] for i in range(0, len(buttons), 2)])
+
+        await call.message.edit_text(text, reply_markup=kb)
+
         notify = {
             "собран": "📦 твой заказ собран и готовится к отправке!",
             "отправлен": "🚚 заказ отправлен! скоро будет у тебя 🎉",
@@ -799,7 +809,7 @@ async def set_status(call: types.CallbackQuery):
             "отменён": "❌ заказ отменён",
         }
         if new_st in notify:
-            try: await bot.send_message(row[0], notify[new_st])
+            try: await bot.send_message(user_id, notify[new_st])
             except: pass
     await call.answer()
 
