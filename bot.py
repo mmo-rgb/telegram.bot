@@ -766,10 +766,10 @@ async def admin_orders(message: types.Message):
         return
     for oid, data, total, status, created in orders:
         e = STATUS_EMOJI.get(status, "❓")
-        all_statuses = ["собран", "отправлен", "доставлен", "отменён"]
-        remaining = [s for s in all_statuses if s != status]
-        buttons = [InlineKeyboardButton(text=f"{STATUS_EMOJI.get(s, '')} {s}", callback_data=f"st_{oid}_{s}") for s in remaining]
-        kb = InlineKeyboardMarkup(inline_keyboard=[buttons[i:i+2] for i in range(0, len(buttons), 2)])
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Оплачено", callback_data=f"st_{oid}_оплачен"),
+             InlineKeyboardButton(text="❌ Отклонить", callback_data=f"st_{oid}_отменён")],
+        ])
         await message.answer(f"📦 Заказ №{oid}\n{created}\n\n{data}\n\nСтатус: {e} {status}", reply_markup=kb)
 
 @dp.callback_query(F.data.startswith("st_"))
@@ -792,21 +792,11 @@ async def set_status(call: types.CallbackQuery):
         user_id, order_data, total, created_at = row
         e = STATUS_EMOJI.get(new_st, "❓")
         text = f"📦 Заказ №{oid}\n{created_at}\n\n{order_data}\n\nСтатус: {e} {new_st}"
-
-        all_statuses = ["собран", "отправлен", "доставлен", "отменён"]
-        remaining = [s for s in all_statuses if s != new_st]
-        buttons = []
-        for s in remaining:
-            buttons.append(InlineKeyboardButton(text=f"{STATUS_EMOJI.get(s, '')} {s}", callback_data=f"st_{oid}_{s}"))
-        kb = InlineKeyboardMarkup(inline_keyboard=[buttons[i:i+2] for i in range(0, len(buttons), 2)])
-
-        await call.message.edit_text(text, reply_markup=kb)
+        await call.message.edit_text(text)
 
         notify = {
-            "собран": "📦 твой заказ собран и готовится к отправке!",
-            "отправлен": "🚚 заказ отправлен! скоро будет у тебя 🎉",
-            "доставлен": "✅ доставлен! спасибо 🤝",
-            "отменён": "❌ заказ отменён",
+            "оплачен": "✅ оплата подтверждена! скоро отправим 🎉",
+            "отменён": "❌ заказ отклонён",
         }
         if new_st in notify:
             try: await bot.send_message(user_id, notify[new_st])
