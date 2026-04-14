@@ -758,7 +758,7 @@ async def admin_orders(message: types.Message):
         return
     conn = sqlite3.connect("shop.db")
     cur = conn.cursor()
-    cur.execute("SELECT id, order_data, total, status, created_at FROM orders WHERE status='новый' ORDER BY created_at DESC")
+    cur.execute("SELECT id, order_data, total, status, created_at FROM orders WHERE status IN ('новый','оплачен') ORDER BY created_at DESC")
     orders = cur.fetchall()
     conn.close()
     if not orders:
