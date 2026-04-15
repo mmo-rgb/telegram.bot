@@ -690,7 +690,8 @@ async def delivery_ozon(call: types.CallbackQuery, state: FSMContext):
     await state.update_data(delivery="Озон 📌", delivery_cost=250)
     await call.message.edit_text(
         "📌 Озон\n\n"
-        "📦 Доставка: <b>250₽</b>\n\n"
+        "📦 Доставка: <b>250₽</b>\n"
+        "⏱ Срок: ориентировочно от 3 до 10 дней\n\n"
         "Для оформления отправь <b>одним сообщением</b>:\n"
         "• Город\n"
         "• Адрес пункта выдачи Озон\n"
