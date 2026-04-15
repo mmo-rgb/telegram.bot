@@ -788,7 +788,8 @@ async def confirm_order(call: types.CallbackQuery, state: FSMContext):
         f"Мальбахов Андзор Х.\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"☝️ нажми на номер карты чтобы скопировать\n"
-        f"после оплаты жми кнопку ниже 👇",
+        f"после оплаты жми кнопку ниже 👇\n\n"
+        f"🚗 стоимость доставки уточняйте у менеджера {MANAGER}",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=f"✅ я оплатил  •  {total_fmt}₽", callback_data=f"paid_{order_id}")],
