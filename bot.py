@@ -9,6 +9,45 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton
 import aiohttp
 from aiogram.client.session.aiohttp import AiohttpSession
+import math
+
+# ========== DELIVERY CONFIG ==========
+NALCHIK_CENTER = (43.4846, 43.6073)  # центр Нальчика
+FREE_DELIVERY_FROM = 5000  # бесплатная доставка от этой суммы
+
+DELIVERY_ZONES = [
+    (3,  200, "Центр города"),
+    (6,  300, "Средняя зона"),
+    (10, 400, "Окраины"),
+    (99, 500, "Пригород"),
+]
+
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return R * 2 * math.asin(math.sqrt(a))
+
+async def geocode_address(address: str):
+    query = f"Нальчик, {address}" if "нальчик" not in address.lower() else address
+    url = "https://nominatim.openstreetmap.org/search"
+    params = {"q": query, "format": "json", "limit": 1, "countrycodes": "ru"}
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params=params, headers={"User-Agent": "RadianceFitBot/1.0"}) as resp:
+            data = await resp.json()
+            if data:
+                return float(data[0]["lat"]), float(data[0]["lon"]), data[0].get("display_name", "")
+    return None, None, None
+
+def calc_delivery_cost(lat, lon, cart_total):
+    if cart_total >= FREE_DELIVERY_FROM:
+        return 0, "Бесплатно"
+    dist = haversine(NALCHIK_CENTER[0], NALCHIK_CENTER[1], lat, lon)
+    for max_km, price, zone_name in DELIVERY_ZONES:
+        if dist <= max_km:
+            return price, f"{zone_name} ({dist:.1f} км)"
+    return DELIVERY_ZONES[-1][1], f"Далеко ({dist:.1f} км)"
 
 # ========== CONFIG ==========
 BOT_TOKEN = "8615838083:AAHQM2oyQDMkNMi4yqdSBBQeJ30OWeNDL7c"
@@ -106,6 +145,7 @@ class AddProduct(StatesGroup):
 
 class OrderForm(StatesGroup):
     delivery_method = State()
+    address_nalchik = State()
     info = State()
     confirm = State()
 
@@ -549,12 +589,91 @@ async def checkout_start(call: types.CallbackQuery, state: FSMContext):
         return
     conn.close()
     kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🚗 Доставка по Нальчику", callback_data="delivery_nalchik")],
         [InlineKeyboardButton(text="🏤 Почта", callback_data="delivery_post")],
         [InlineKeyboardButton(text="📌 Озон", callback_data="delivery_ozon")],
     ])
     await call.message.answer("📦 выбери способ доставки:", reply_markup=kb)
     await state.set_state(OrderForm.delivery_method)
     await call.answer()
+
+@dp.callback_query(F.data == "delivery_nalchik", OrderForm.delivery_method)
+async def delivery_nalchik(call: types.CallbackQuery, state: FSMContext):
+    uid = call.from_user.id
+    conn = sqlite3.connect("shop.db")
+    cur = conn.cursor()
+    cur.execute("""SELECT p.price, c.quantity FROM cart c
+                   JOIN products p ON c.product_id = p.id WHERE c.user_id=?""", (uid,))
+    items = cur.fetchall()
+    conn.close()
+    cart_total = sum(p * q for p, q in items)
+
+    free_note = ""
+    if cart_total < FREE_DELIVERY_FROM:
+        left = FREE_DELIVERY_FROM - cart_total
+        free_note = f"\n💡 до бесплатной доставки не хватает {fmt_price(left)}₽"
+    else:
+        free_note = "\n🎉 у тебя бесплатная доставка!"
+
+    await state.update_data(delivery="Доставка по Нальчику 🚗")
+    await call.message.edit_text(
+        "🚗 Доставка по Нальчику\n\n"
+        "📍 Отправь свой адрес:\n"
+        "улица и дом (например: ул. Ленина 15)\n"
+        f"{free_note}"
+    )
+    await state.set_state(OrderForm.address_nalchik)
+    await call.answer()
+
+@dp.message(OrderForm.address_nalchik)
+async def process_nalchik_address(message: types.Message, state: FSMContext):
+    address = message.text.strip()
+    await message.answer("🔍 ищу адрес...")
+
+    lat, lon, display = await geocode_address(address)
+
+    if not lat:
+        await message.answer(
+            "❌ Не смог найти адрес. Попробуй точнее:\n"
+            "например: ул. Кирова 20 или пр. Ленина 47"
+        )
+        return
+
+    uid = message.from_user.id
+    conn = sqlite3.connect("shop.db")
+    cur = conn.cursor()
+    cur.execute("""SELECT p.price, c.quantity FROM cart c
+                   JOIN products p ON c.product_id = p.id WHERE c.user_id=?""", (uid,))
+    items = cur.fetchall()
+    conn.close()
+    cart_total = sum(p * q for p, q in items)
+
+    cost, zone_info = calc_delivery_cost(lat, lon, cart_total)
+
+    await state.update_data(
+        delivery=f"Доставка по Нальчику 🚗",
+        delivery_cost=cost,
+        delivery_address=address,
+        info=f"📍 {address}\n🗺 {zone_info}\n🚗 Доставка: {fmt_price(cost)}₽" if cost > 0 else f"📍 {address}\n🗺 {zone_info}\n🎉 Доставка: бесплатно"
+    )
+
+    if cost > 0:
+        text = (
+            f"📍 Адрес: {address}\n"
+            f"🗺 Зона: {zone_info}\n\n"
+            f"🚗 Доставка: <b>{fmt_price(cost)}₽</b>\n\n"
+            f"📱 Отправь номер телефона для связи с курьером 👇"
+        )
+    else:
+        text = (
+            f"📍 Адрес: {address}\n"
+            f"🗺 Зона: {zone_info}\n\n"
+            f"🎉 <b>Доставка бесплатно!</b>\n\n"
+            f"📱 Отправь номер телефона для связи с курьером 👇"
+        )
+
+    await message.answer(text, parse_mode="HTML")
+    await state.set_state(OrderForm.info)
 
 @dp.callback_query(F.data == "delivery_post", OrderForm.delivery_method)
 async def delivery_post(call: types.CallbackQuery, state: FSMContext):
@@ -605,10 +724,18 @@ async def order_info(message: types.Message, state: FSMContext):
         return
 
     total = sum(p * q for _, p, q in items)
+    delivery_cost = data.get("delivery_cost", 0)
+    grand_total = total + delivery_cost
+
     text = f"📝 проверь заказ:\n\n📦 {data['delivery']}\n\n📋 {data['info']}\n\n"
     for name, price, qty in items:
         text += f"▸ {name} × {qty} = {fmt_price(price*qty)}₽\n"
-    text += f"\nитого: {fmt_price(total)}₽\n\nвсё верно?"
+    text += f"\n🛒 товары: {fmt_price(total)}₽"
+    if delivery_cost > 0:
+        text += f"\n🚗 доставка: {fmt_price(delivery_cost)}₽"
+    elif "Нальчик" in data.get("delivery", ""):
+        text += f"\n🚗 доставка: бесплатно"
+    text += f"\n\n💰 итого: {fmt_price(grand_total)}₽\n\nвсё верно?"
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅ да, оформить", callback_data="confirm_order")],
@@ -628,20 +755,26 @@ async def confirm_order(call: types.CallbackQuery, state: FSMContext):
                    JOIN products p ON c.product_id = p.id WHERE c.user_id=?""", (uid,))
     items = cur.fetchall()
     total = sum(p * q for _, p, q in items)
+    delivery_cost = data.get("delivery_cost", 0)
+    grand_total = total + delivery_cost
 
     order_text = f"📦 {data['delivery']}\n\n📋 {data['info']}\n\n"
     for name, price, qty in items:
         order_text += f"{name} × {qty} = {price*qty}₽\n"
-    order_text += f"\nИтого: {total}₽"
+    if delivery_cost > 0:
+        order_text += f"\n🚗 Доставка: {delivery_cost}₽"
+    elif "Нальчик" in data.get("delivery", ""):
+        order_text += f"\n🚗 Доставка: бесплатно"
+    order_text += f"\nИтого: {grand_total}₽"
 
-    cur.execute("INSERT INTO orders (user_id, order_data, total) VALUES (?, ?, ?)", (uid, order_text, total))
+    cur.execute("INSERT INTO orders (user_id, order_data, total) VALUES (?, ?, ?)", (uid, order_text, grand_total))
     order_id = cur.lastrowid
     cur.execute("DELETE FROM cart WHERE user_id=?", (uid,))
     conn.commit()
     conn.close()
 
     card = "2200 7013 0843 9469"
-    total_fmt = fmt_price(total)
+    total_fmt = fmt_price(grand_total)
     
     await call.message.edit_text(
         f"━━━━━━━━━━━━━━━━━━━\n"
