@@ -589,107 +589,101 @@ async def checkout_start(call: types.CallbackQuery, state: FSMContext):
         return
     conn.close()
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🚗 Доставка по Нальчику", callback_data="delivery_nalchik")],
-        [InlineKeyboardButton(text="🏤 Почта", callback_data="delivery_post")],
+        [InlineKeyboardButton(text="🏤 Почта России", callback_data="delivery_post")],
         [InlineKeyboardButton(text="📌 Озон", callback_data="delivery_ozon")],
     ])
     await call.message.answer("📦 выбери способ доставки:", reply_markup=kb)
     await state.set_state(OrderForm.delivery_method)
     await call.answer()
 
-@dp.callback_query(F.data == "delivery_nalchik", OrderForm.delivery_method)
-async def delivery_nalchik(call: types.CallbackQuery, state: FSMContext):
-    uid = call.from_user.id
-    conn = sqlite3.connect("shop.db")
-    cur = conn.cursor()
-    cur.execute("""SELECT p.price, c.quantity FROM cart c
-                   JOIN products p ON c.product_id = p.id WHERE c.user_id=?""", (uid,))
-    items = cur.fetchall()
-    conn.close()
-    cart_total = sum(p * q for p, q in items)
-
-    free_note = ""
-    if cart_total < FREE_DELIVERY_FROM:
-        left = FREE_DELIVERY_FROM - cart_total
-        free_note = f"\n💡 до бесплатной доставки не хватает {fmt_price(left)}₽"
-    else:
-        free_note = "\n🎉 у тебя бесплатная доставка!"
-
-    await state.update_data(delivery="Доставка по Нальчику 🚗")
+@dp.callback_query(F.data == "delivery_post", OrderForm.delivery_method)
+async def delivery_post(call: types.CallbackQuery, state: FSMContext):
+    await state.update_data(delivery="Почта России 🏤")
     await call.message.edit_text(
-        "🚗 Доставка по Нальчику\n\n"
-        "📍 Отправь свой адрес:\n"
-        "улица и дом (например: ул. Ленина 15)\n"
-        f"{free_note}"
+        "🏤 Почта России\n\n"
+        "📍 Напиши свой <b>город</b>, чтобы рассчитать стоимость доставки\n\n"
+        "например: Москва, Краснодар, Новосибирск",
+        parse_mode="HTML"
     )
     await state.set_state(OrderForm.address_nalchik)
     await call.answer()
 
 @dp.message(OrderForm.address_nalchik)
-async def process_nalchik_address(message: types.Message, state: FSMContext):
-    address = message.text.strip()
-    await message.answer("🔍 ищу адрес...")
-
-    lat, lon, display = await geocode_address(address)
-
-    if not lat:
-        await message.answer(
-            "❌ Не смог найти адрес. Попробуй точнее:\n"
-            "например: ул. Кирова 20 или пр. Ленина 47"
-        )
-        return
-
-    uid = message.from_user.id
-    conn = sqlite3.connect("shop.db")
-    cur = conn.cursor()
-    cur.execute("""SELECT p.price, c.quantity FROM cart c
-                   JOIN products p ON c.product_id = p.id WHERE c.user_id=?""", (uid,))
-    items = cur.fetchall()
-    conn.close()
-    cart_total = sum(p * q for p, q in items)
-
-    cost, zone_info = calc_delivery_cost(lat, lon, cart_total)
-
-    await state.update_data(
-        delivery=f"Доставка по Нальчику 🚗",
-        delivery_cost=cost,
-        delivery_address=address,
-        info=f"📍 {address}\n🗺 {zone_info}\n🚗 Доставка: {fmt_price(cost)}₽" if cost > 0 else f"📍 {address}\n🗺 {zone_info}\n🎉 Доставка: бесплатно"
-    )
-
-    if cost > 0:
-        text = (
-            f"📍 Адрес: {address}\n"
-            f"🗺 Зона: {zone_info}\n\n"
-            f"🚗 Доставка: <b>{fmt_price(cost)}₽</b>\n\n"
-            f"📱 Отправь номер телефона для связи с курьером 👇"
-        )
+async def process_post_city(message: types.Message, state: FSMContext):
+    city = message.text.strip()
+    
+    # Расчёт доставки по зонам от Нальчика
+    city_lower = city.lower()
+    
+    # Зоны доставки Почтой России (примерные)
+    zone1 = ["нальчик", "пятигорск", "минеральные воды", "кисловодск", "ессентуки", 
+              "нарткала", "прохладный", "баксан", "терек", "черкесск", "владикавказ",
+              "грозный", "махачкала", "ставрополь", "невинномысск"]
+    zone2 = ["ростов", "краснодар", "сочи", "волгоград", "астрахань", "элиста",
+              "армавир", "новороссийск", "анапа", "геленджик", "майкоп", "туапсе"]
+    zone3 = ["москва", "санкт-петербург", "питер", "спб", "казань", "нижний новгород",
+              "воронеж", "самара", "саратов", "тула", "рязань", "тверь", "ярославль",
+              "калуга", "орёл", "курск", "белгород", "тамбов", "пенза", "ульяновск"]
+    zone4 = ["екатеринбург", "челябинск", "тюмень", "пермь", "уфа", "омск",
+              "новосибирск", "красноярск", "иркутск", "томск", "барнаул", "кемерово"]
+    zone5 = ["хабаровск", "владивосток", "якутск", "магадан", "южно-сахалинск",
+              "петропавловск", "благовещенск", "чита", "улан-удэ"]
+    
+    delivery_cost = 350  # по умолчанию
+    zone_name = ""
+    
+    for z in zone1:
+        if z in city_lower:
+            delivery_cost = 200
+            zone_name = "СКФО"
+            break
     else:
-        text = (
-            f"📍 Адрес: {address}\n"
-            f"🗺 Зона: {zone_info}\n\n"
-            f"🎉 <b>Доставка бесплатно!</b>\n\n"
-            f"📱 Отправь номер телефона для связи с курьером 👇"
-        )
-
-    await message.answer(text, parse_mode="HTML")
-    await state.set_state(OrderForm.info)
-
-@dp.callback_query(F.data == "delivery_post", OrderForm.delivery_method)
-async def delivery_post(call: types.CallbackQuery, state: FSMContext):
-    await state.update_data(delivery="Почта 🏤")
-    await call.message.edit_text(
-        "🏤 Почта\n\n"
-        "Для оформления заказа нам понадобятся следующие данные:\n"
-        "• Ф.И.О. получателя\n"
-        "• Номер мобильного телефона\n"
-        "• Индекс почтового отделения\n"
-        "• Адрес почтового отделения\n"
-        "• Город\n\n"
-        "✏️ отправь всё одним сообщением 👇"
+        for z in zone2:
+            if z in city_lower:
+                delivery_cost = 300
+                zone_name = "Юг России"
+                break
+        else:
+            for z in zone3:
+                if z in city_lower:
+                    delivery_cost = 350
+                    zone_name = "Центральная Россия"
+                    break
+            else:
+                for z in zone4:
+                    if z in city_lower:
+                        delivery_cost = 450
+                        zone_name = "Урал / Сибирь"
+                        break
+                else:
+                    for z in zone5:
+                        if z in city_lower:
+                            delivery_cost = 550
+                            zone_name = "Дальний Восток"
+                            break
+                    else:
+                        delivery_cost = 400
+                        zone_name = "Россия"
+    
+    await state.update_data(
+        delivery_cost=delivery_cost,
+        delivery_address=city,
+        delivery=f"Почта России 🏤 → {city}"
+    )
+    
+    await message.answer(
+        f"🏤 <b>Почта России</b>\n\n"
+        f"📍 Город: <b>{city}</b>\n"
+        f"🗺 Зона: {zone_name}\n"
+        f"📦 Доставка: <b>{fmt_price(delivery_cost)}₽</b>\n"
+        f"⏱ Срок: 3-10 рабочих дней\n\n"
+        f"Для оформления отправь <b>одним сообщением</b>:\n"
+        f"• Ф.И.О. получателя\n"
+        f"• Номер телефона\n"
+        f"• Индекс и адрес\n",
+        parse_mode="HTML"
     )
     await state.set_state(OrderForm.info)
-    await call.answer()
 
 @dp.callback_query(F.data == "delivery_ozon", OrderForm.delivery_method)
 async def delivery_ozon(call: types.CallbackQuery, state: FSMContext):
@@ -789,7 +783,8 @@ async def confirm_order(call: types.CallbackQuery, state: FSMContext):
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"☝️ нажми на номер карты чтобы скопировать\n"
         f"после оплаты жми кнопку ниже 👇\n\n"
-        f"🚗 стоимость доставки уточняйте у менеджера {MANAGER}",
+        f"🚗 стоимость доставки включена в итог\n"
+        f"вопросы по доставке: {MANAGER}",
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text=f"✅ я оплатил  •  {total_fmt}₽", callback_data=f"paid_{order_id}")],
