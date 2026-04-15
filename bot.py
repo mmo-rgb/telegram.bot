@@ -687,14 +687,15 @@ async def process_post_city(message: types.Message, state: FSMContext):
 
 @dp.callback_query(F.data == "delivery_ozon", OrderForm.delivery_method)
 async def delivery_ozon(call: types.CallbackQuery, state: FSMContext):
-    await state.update_data(delivery="Озон 📌")
+    await state.update_data(delivery="Озон 📌", delivery_cost=250)
     await call.message.edit_text(
         "📌 Озон\n\n"
-        "Для оформления заказа нам понадобятся следующие данные:\n"
+        "📦 Доставка: <b>250₽</b>\n\n"
+        "Для оформления отправь <b>одним сообщением</b>:\n"
         "• Город\n"
         "• Адрес пункта выдачи Озон\n"
-        "• Номер телефона, привязанный к Озону\n\n"
-        "✏️ отправь всё одним сообщением 👇"
+        "• Номер телефона, привязанный к Озону\n",
+        parse_mode="HTML"
     )
     await state.set_state(OrderForm.info)
     await call.answer()
