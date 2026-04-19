@@ -781,7 +781,7 @@ async def confirm_order(call: types.CallbackQuery, state: FSMContext):
         f"📋 Номер карты:\n"
         f"`{card}`\n\n"
         f"👤 Получатель:\n"
-        f"Мальбахов Анзор Х.\n\n"
+        f"Анзор М.\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"☝️ нажми на номер карты чтобы скопировать\n"
         f"после оплаты жми кнопку ниже 👇\n\n"
