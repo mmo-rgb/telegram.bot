@@ -53,7 +53,7 @@ def calc_delivery_cost(lat, lon, cart_total):
 BOT_TOKEN = "8615838083:AAHQM2oyQDMkNMi4yqdSBBQeJ30OWeNDL7c"
 ADMIN_ID = 6175936997
 MANAGER = "@radiancefit"
-ADMIN_USERNAMES = ["radiancefit", "trapmentality1"]
+ADMIN_USERNAMES = ["radiancefit", "trapmentality1", "mbdnl"]
 PROXY_URL = ""
 # =============================
 
